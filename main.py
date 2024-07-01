@@ -1,8 +1,8 @@
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
-    AsyncSession,
     AsyncEngine,
 )
 from hero_model import Hero
@@ -14,6 +14,14 @@ async def create_table(async_engine: AsyncEngine):
         await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
     await async_engine.dispose()
+
+
+async def get_session(async_engine):
+    async_session = async_sessionmaker(
+        async_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with async_session.begin() as session:
+        yield session
 
 
 async def main(async_engine):
@@ -66,6 +74,21 @@ async def main(async_engine):
     await async_engine.dispose()
 
 
+async def search(async_engine):
+    # async_session = async_sessionmaker(
+    #     async_engine, class_=AsyncSession, expire_on_commit=False
+    # )
+    async_session = async_sessionmaker(
+        bind=async_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with async_session.begin() as asession:
+        statement = select(Hero).where(Hero.id == 1)
+        results = await asession.exec(statement)
+        hero = results.one()
+        print(hero.secret_name)
+    await async_engine.dispose()
+
+
 if __name__ == "__main__":
     import asyncio
 
@@ -73,4 +96,4 @@ if __name__ == "__main__":
         "mysql+aiomysql://sgn04088:whgudwns1997@localhost/sqlmodel", echo=True
     )
 
-    asyncio.run(main(async_engine))
+    asyncio.run(search(async_engine))
