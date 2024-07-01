@@ -1,15 +1,18 @@
 from typing import List
-from sqlmodel import SQLModel, Field, Relationship, ForeignKey
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-
-async_engine = create_async_engine(
-    "mysql+aiomysql://sgn04088:whgudwns1997@localhost/sqlmodel", echo=True
+from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    async_sessionmaker,
+    AsyncSession,
+    AsyncEngine,
 )
 
 
 class HeroTeamLink(SQLModel, table=True):
-    hero_id: int | None = Field(default=None, primary_key=True)
-    team_id: int | None = Field(default=None, primary_key=True)
+    hero_id: int | None = Field(
+        default=None, primary_key=True, foreign_key="hero.id")
+    team_id: int | None = Field(
+        default=None, primary_key=True, foreign_key="team.id")
 
 
 class Team(SQLModel, table=True):
@@ -17,7 +20,8 @@ class Team(SQLModel, table=True):
     name: str
     headquarters: str
 
-    heroes: List["Hero"] = Relationship(back_populates="teams", link_model=HeroTeamLink)
+    heroes: List["Hero"] = Relationship(
+        back_populates="teams", link_model=HeroTeamLink)
 
 
 class Hero(SQLModel, table=True):
@@ -30,17 +34,22 @@ class Hero(SQLModel, table=True):
     )
 
 
-async def create_table():
+async def create_table(async_engine: AsyncEngine):
     async with async_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
     await async_engine.dispose()
 
 
-async def main(self):
-    async with AsyncSession(async_engine) as session:
+async def main(async_engine):
+    await create_table(async_engine)
+    async_session = async_sessionmaker(
+        async_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with async_session.begin() as asession:
         team_preventers = Team(name="Preventers", headquarters="Sharp Tower")
-        team_z_force = Team(name="Z-Force", headquarters="Sister Margaret's Bar")
+        team_z_force = Team(
+            name="Z-Force", headquarters="Sister Margaret's Bar")
 
         hero_deadpond = Hero(
             name="Deadpond",
@@ -56,26 +65,38 @@ async def main(self):
         hero_spider_boy = Hero(
             name="Spider-Boy", secret_name="Pedro Parqueador", teams=[team_preventers]
         )
-        session.add(hero_deadpond)
-        session.add(hero_rusty_man)
-        session.add(hero_spider_boy)
-        await session.commit()
+        asession.add(hero_deadpond)
+        asession.add(hero_rusty_man)
+        asession.add(hero_spider_boy)
 
-        session.refresh(hero_deadpond)
-        session.refresh(hero_rusty_man)
-        session.refresh(hero_spider_boy)
+        # Heroes' IDs are not printed here because they are not committed yet.
+        # print("Deadpond:", hero_deadpond)
+        # print("Deadpond teams:", hero_deadpond.teams)
+        # print("Rusty-Man:", hero_rusty_man)
+        # print("Rusty-Man Teams:", hero_rusty_man.teams)
+        # print("Spider-Boy:", hero_spider_boy)
+        # print("Spider-Boy Teams:", hero_spider_boy.teams)
 
-        print("Deadpond:", hero_deadpond)
-        print("Deadpond teams:", hero_deadpond.teams)
-        print("Rusty-Man:", hero_rusty_man)
-        print("Rusty-Man Teams:", hero_rusty_man.teams)
-        print("Spider-Boy:", hero_spider_boy)
-        print("Spider-Boy Teams:", hero_spider_boy.teams)
+        # Committing is executed automatically when the async with block is exited.
+        # await asession.commit()
 
-        await session.commit()
+    # Heroes' IDs are printed here because they are committed.
+    # To print the instances, expire_on_commit must be False.
+    print("Deadpond:", hero_deadpond)
+    print("Deadpond teams:", hero_deadpond.teams)
+    print("Rusty-Man:", hero_rusty_man)
+    print("Rusty-Man Teams:", hero_rusty_man.teams)
+    print("Spider-Boy:", hero_spider_boy)
+    print("Spider-Boy Teams:", hero_spider_boy.teams)
+
+    await async_engine.dispose()
 
 
 if __name__ == "__main__":
     import asyncio
 
-    asyncio.run(create_table())
+    async_engine = create_async_engine(
+        "mysql+aiomysql://sgn04088:whgudwns1997@localhost/sqlmodel", echo=True
+    )
+
+    asyncio.run(main(async_engine))
