@@ -1,37 +1,12 @@
-from typing import List
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
     AsyncSession,
     AsyncEngine,
 )
-
-
-class HeroTeamLink(SQLModel, table=True):
-    hero_id: int | None = Field(
-        default=None, primary_key=True, foreign_key="hero.id")
-    team_id: int | None = Field(
-        default=None, primary_key=True, foreign_key="team.id")
-
-
-class Team(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    name: str
-    headquarters: str
-
-    heroes: List["Hero"] = Relationship(
-        back_populates="teams", link_model=HeroTeamLink)
-
-
-class Hero(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    secret_name: str
-    age: int | None = Field(default=None, index=True)
-    teams: List[Team] | None = Relationship(
-        back_populates="heroes", link_model=HeroTeamLink
-    )
+from hero_model import Hero
+from team_model import Team
 
 
 async def create_table(async_engine: AsyncEngine):
@@ -48,8 +23,7 @@ async def main(async_engine):
     )
     async with async_session.begin() as asession:
         team_preventers = Team(name="Preventers", headquarters="Sharp Tower")
-        team_z_force = Team(
-            name="Z-Force", headquarters="Sister Margaret's Bar")
+        team_z_force = Team(name="Z-Force", headquarters="Sister Margaret's Bar")
 
         hero_deadpond = Hero(
             name="Deadpond",
